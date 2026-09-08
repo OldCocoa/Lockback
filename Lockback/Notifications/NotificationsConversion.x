@@ -10,19 +10,25 @@
 @end
 
 @interface NSObject (LBNotificationsConversionPrivateMethodsCase)
+- (id)bulletin;
 - (id)bulletinID;
+- (id)defaultAction;
+- (void)notificationListViewController:(id)listViewControllerCase requestPermissionToExecuteAction:(id)actionCase forNotificationRequest:(id)notificationRequestCase withParameters:(id)parametersCase completion:(void (^)(BOOL permittedCase))completionCase;
+- (void)notificationListViewController:(id)listViewControllerCase requestsExecuteAction:(id)actionCase forNotificationRequest:(id)notificationRequestCase withParameters:(id)parametersCase completion:(void (^)(BOOL successCase))completionCase;
 @end
 
 // Stores the iOS requests and forwards their iOS bulletins to the restored notification controller.
 @interface LBNotificationRequestBridgeCase : NSObject
 @property (nonatomic, strong) NSMutableDictionary *notificationRequestsByIdentifierCase;
 @property (nonatomic, weak) SBLockScreenNotificationListController *notificationControllerCase;
+@property (nonatomic, weak) id dashboardNotificationControllerCase;
 + (instancetype)sharedBridgeCase;
 - (void)attachNotificationControllerCase:(SBLockScreenNotificationListController *)notificationControllerCase;
 - (void)detachNotificationControllerCase:(SBLockScreenNotificationListController *)notificationControllerCase;
 - (void)postNotificationRequestCase:(id)notificationRequestCase;
 - (void)updateNotificationRequestCase:(id)notificationRequestCase;
 - (void)withdrawNotificationRequestCase:(id)notificationRequestCase;
+- (BOOL)executeDefaultActionForBulletinCase:(id)bulletinCase completionCase:(void (^)(BOOL successCase))completionCase;
 @end
 
 // Gets the underlying bulletin from an iOS notification request.
@@ -134,28 +140,77 @@ static NSString *lbNotificationRequestIdentifierCase(id notificationRequestCase)
     if (notificationControllerCase && bulletinCase) { [notificationControllerCase observer:lbObserverForNotificationRequestCase(storedNotificationRequestCase ?: notificationRequestCase) removeBulletin:bulletinCase]; }
 }
 
+// Gets the action from an iOS notification and puts it back into the bulletin for proper "slide to view" action.
+- (BOOL)executeDefaultActionForBulletinCase:(id)bulletinCase completionCase:(void (^)(BOOL successCase))completionCase {
+    id bulletinIdentifierCase = [bulletinCase respondsToSelector:@selector(bulletinID)] ? [bulletinCase bulletinID] : nil;
+
+    NSString *notificationIdentifierCase = [bulletinIdentifierCase isKindOfClass:[NSString class]] ? bulletinIdentifierCase : [bulletinIdentifierCase description];
+
+    id notificationRequestCase = notificationIdentifierCase ? self.notificationRequestsByIdentifierCase[notificationIdentifierCase] : nil;
+    id dashboardNotificationControllerCase = self.dashboardNotificationControllerCase;
+    id defaultActionCase = [notificationRequestCase respondsToSelector:@selector(defaultAction)] ? [notificationRequestCase defaultAction] : nil;
+
+    if (!notificationRequestCase || !dashboardNotificationControllerCase || !defaultActionCase) {
+        if (completionCase) { completionCase(NO); }
+        return NO;
+    }
+
+    void (^executeActionCase)(void) = ^{
+        [dashboardNotificationControllerCase notificationListViewController:nil requestsExecuteAction:defaultActionCase forNotificationRequest:notificationRequestCase withParameters:nil completion:^(BOOL successCase) {
+            if (completionCase) { completionCase(successCase); }
+        }];
+    };
+
+    [dashboardNotificationControllerCase notificationListViewController:nil requestPermissionToExecuteAction:defaultActionCase forNotificationRequest:notificationRequestCase withParameters:nil completion:^(BOOL permittedCase) {
+        if (permittedCase) { executeActionCase(); } 
+        else if (completionCase) { completionCase(NO); }
+    }];
+
+    return YES;
+}
+
 @end
 
 void lbAttachNotificationConversionControllerCase(id notificationControllerCase) { [[LBNotificationRequestBridgeCase sharedBridgeCase] attachNotificationControllerCase:notificationControllerCase]; }
 void lbDetachNotificationConversionControllerCase(id notificationControllerCase) { [[LBNotificationRequestBridgeCase sharedBridgeCase] detachNotificationControllerCase:notificationControllerCase]; }
+BOOL lbExecuteConvertedNotificationActionCase(id bulletinCase, void (^completionCase)(BOOL successCase)) { return [[LBNotificationRequestBridgeCase sharedBridgeCase] executeDefaultActionForBulletinCase:bulletinCase completionCase:completionCase]; }
 
 // Watches the iOS notification list so every request can be mirrored into the iOS controller.
 %group LBNotificationsConversionCase
 
+%hook SBLockScreenNotificationListController
+
+- (void)handleLockScreenActionWithContext:(id)actionContextCase {
+    id bulletinCase = [actionContextCase respondsToSelector:@selector(bulletin)] ? [actionContextCase bulletin] : nil;
+    if (LBLockbackEnabled() && bulletinCase && lbExecuteConvertedNotificationActionCase(bulletinCase, nil)) { return; }
+    %orig;
+}
+
+%end
+
 %hook SBDashBoardNotificationListViewController
+
+- (id)initWithNibName:(NSString *)nibNameCase bundle:(NSBundle *)bundleCase {
+    id dashboardNotificationControllerCase = %orig;
+    [LBNotificationRequestBridgeCase sharedBridgeCase].dashboardNotificationControllerCase = dashboardNotificationControllerCase;
+    return dashboardNotificationControllerCase;
+}
 
 - (void)postNotificationRequest:(id)notificationRequestCase forCoalescedNotification:(id)coalescedNotificationCase {
     %orig;
+    [LBNotificationRequestBridgeCase sharedBridgeCase].dashboardNotificationControllerCase = self;
     if (LBLockbackEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] postNotificationRequestCase:notificationRequestCase]; }
 }
 
 - (void)updateNotificationRequest:(id)notificationRequestCase forCoalescedNotification:(id)coalescedNotificationCase {
     %orig;
+    [LBNotificationRequestBridgeCase sharedBridgeCase].dashboardNotificationControllerCase = self;
     if (LBLockbackEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] updateNotificationRequestCase:notificationRequestCase]; }
 }
 
 - (void)withdrawNotificationRequest:(id)notificationRequestCase forCoalescedNotification:(id)coalescedNotificationCase {
     %orig;
+    [LBNotificationRequestBridgeCase sharedBridgeCase].dashboardNotificationControllerCase = self;
     if (LBLockbackEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] withdrawNotificationRequestCase:notificationRequestCase]; }
 }
 
