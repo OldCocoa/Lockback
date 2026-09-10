@@ -49,12 +49,9 @@ static void LBHideMainPageElements(SBDashBoardMainPageView *mainPageViewCase) {
     LBHideView([mainPageViewCase wallpaperEffectView]);
 }
 
-
 // Prevents the suggested-app grabber from appearing over the replacement camera grabber.
 static void LBHideDashboardSlideUpGrabber(id dashboardViewControllerCase) {
-    if (![dashboardViewControllerCase respondsToSelector:@selector(mainPageViewController)]) {
-        return;
-    }
+    if (![dashboardViewControllerCase respondsToSelector:@selector(mainPageViewController)]) { return; }
 
     id mainPageViewControllerCase = [dashboardViewControllerCase mainPageViewController];
     id contentViewControllerCase = [mainPageViewControllerCase respondsToSelector:@selector(contentViewController)] ? [mainPageViewControllerCase contentViewController] : nil;
@@ -140,7 +137,6 @@ static void LBHideDashboardSlideUpGrabber(id dashboardViewControllerCase) {
 
 %end
 
-
 // Disables the native iOS music player.
 %hook SBDashBoardNowPlayingViewController
 
@@ -178,7 +174,6 @@ static void LBHideDashboardSlideUpGrabber(id dashboardViewControllerCase) {
 }
 
 %end
-
 
 // Hides the native lock item from the status bar.
 %hook SBStatusBarStateAggregator

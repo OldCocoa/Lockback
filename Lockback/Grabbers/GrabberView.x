@@ -37,7 +37,7 @@ static void LBApplyIOSNineGrabberGeometry(UIView *grabberViewCase) {
     if (!grabberViewCase) { return; }
 
     CGRect grabberFrameCase = grabberViewCase.frame;
-    
+
     grabberFrameCase.size = CGSizeMake(36.0, 14.0);
     grabberViewCase.frame = grabberFrameCase;
 
@@ -118,7 +118,7 @@ static void LBPositionCenteredGrabber(UIView *grabberViewCase, CGFloat viewWidth
 
     grabberFrameCase.origin.x = LBPixelRound((viewWidthCase - CGRectGetWidth(grabberFrameCase)) / 2.0);
     grabberFrameCase.origin.y = bottomCase ? viewHeightCase - CGRectGetHeight(grabberFrameCase) - marginCase + grabberOffsetCase : marginCase - grabberOffsetCase;
-    
+
     grabberViewCase.frame = grabberFrameCase;
 }
 
@@ -176,7 +176,7 @@ static void LBPositionCenteredGrabber(UIView *grabberViewCase, CGFloat viewWidth
         CGRect cameraGrabberFrameCase = cameraGrabberViewCase.frame;
         BOOL isRightToLeftCase = [UIApplication sharedApplication].userInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
 
-        cameraGrabberFrameCase.origin.x = isRightToLeftCase ? cameraGrabberInsetCase : viewWidthCase - CGRectGetWidth(cameraGrabberFrameCase) - cameraGrabberInsetCase;
+        cameraGrabberFrameCase.origin.x = (isRightToLeftCase ? cameraGrabberInsetCase : viewWidthCase - CGRectGetWidth(cameraGrabberFrameCase) - cameraGrabberInsetCase) + self.cameraPageOffsetCase;
         cameraGrabberFrameCase.origin.y = viewHeightCase - CGRectGetHeight(cameraGrabberFrameCase) - cameraGrabberInsetCase;
         cameraGrabberViewCase.frame = cameraGrabberFrameCase;
     }
@@ -187,6 +187,13 @@ static void LBPositionCenteredGrabber(UIView *grabberViewCase, CGFloat viewWidth
 // Updates how far the top and bottom grabbers should move offscreen while paging.
 - (void)updateGrabberScrollProgress:(CGFloat)scrollProgressCase {
     self.scrollProgressCase = scrollProgressCase;
+    [self setNeedsLayout];
+    [self layoutIfNeeded];
+}
+
+// Keeps the camera grabber attached to the lock-screen page during horizontal movement.
+- (void)updateCameraPageOffset:(CGFloat)cameraPageOffsetCase {
+    self.cameraPageOffsetCase = cameraPageOffsetCase;
     [self setNeedsLayout];
     [self layoutIfNeeded];
 }
@@ -281,7 +288,6 @@ void LBInstallGrabberOverlay(UIView *dashboardViewCase) {
     [grabberOverlayViewCase updateMediaControlsVisibility:lbMediaControlsVisibleCase];
     [dashboardViewCase bringSubviewToFront:grabberOverlayViewCase];
 }
-
 
 %group LBGrabberView
 

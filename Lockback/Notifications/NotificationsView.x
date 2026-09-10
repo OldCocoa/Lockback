@@ -2,6 +2,7 @@
 
 #import <UIKit/UIKit.h>
 #import "../LockbackUtils.h"
+#import "NotificationsShared.h"
 
 @class LBNotificationsView;
 
@@ -9,6 +10,10 @@
 - (void)setDelegate:(id)delegateCase;
 - (void)setIsOnscreen:(BOOL)isOnscreenCase;
 - (void)prepareForTeardown;
+@end
+
+@interface SBLockScreenNotificationCell : UIView
+- (UIScrollView *)contentScrollView;
 @end
 
 void lbAttachNotificationConversionControllerCase(id notificationControllerCase);
@@ -30,6 +35,7 @@ void lbInitializeNotificationsConversionCase(void);
 - (void)setComputesColorSettings:(BOOL)computesColorSettingsCase;
 - (id)inputSettings;
 - (void)setBlurRadius:(CGFloat)blurRadiusCase;
+- (id)contentScrollView;
 @end
 
 // Bridges the callbacks expected by the iOS notification list controller into the iOS dashboard.
@@ -47,6 +53,8 @@ void lbInitializeNotificationsConversionCase(void);
 @property (nonatomic, strong) LBNotificationsListDelegate *notificationDelegateCase;
 @property (nonatomic) CGFloat blurRadiusCase;
 @property (nonatomic) CGFloat tintAlphaCase;
+@property (nonatomic) BOOL notificationBackgroundVisibleCase;
+@property (nonatomic) BOOL passcodeBackgroundPinnedCase;
 - (instancetype)initWithFrame:(CGRect)viewFrameCase dashboardView:(UIView *)dashboardViewCase;
 - (void)installNotificationBackground;
 - (void)attachNotificationBackground;
@@ -55,9 +63,10 @@ void lbInitializeNotificationsConversionCase(void);
 @end
 
 // Updates the private backdrop blur radius used behind the notification list.
+static BOOL lbNotificationBackgroundOwnsPasscodeBlurCase = NO;
+
 static void LBSetNotificationBlurRadiusCase(LBNotificationsView *notificationsViewCase, CGFloat blurRadiusCase) {
     id inputSettingsCase = [notificationsViewCase.backdropViewCase respondsToSelector:@selector(inputSettings)] ? [(id)notificationsViewCase.backdropViewCase inputSettings] : nil;
-
     if ([inputSettingsCase respondsToSelector:@selector(setBlurRadius:)]) { [inputSettingsCase setBlurRadius:blurRadiusCase]; }
 }
 
@@ -128,7 +137,7 @@ static void LBSetNotificationBlurRadiusCase(LBNotificationsView *notificationsVi
     id underlayFactoryCase = [notificationControllerClassCase respondsToSelector:@selector(underlayPropertiesFactory)] ? [(id)notificationControllerClassCase underlayPropertiesFactory] : nil;
     id underlayPropertiesCase = nil;
 
-    if ([underlayFactoryCase respondsToSelector:@selector(propertiesWithDeviceDefaultGraphicsQuality)]) { underlayPropertiesCase = [underlayFactoryCase propertiesWithDeviceDefaultGraphicsQuality]; } 
+    if ([underlayFactoryCase respondsToSelector:@selector(propertiesWithDeviceDefaultGraphicsQuality)]) { underlayPropertiesCase = [underlayFactoryCase propertiesWithDeviceDefaultGraphicsQuality]; }
     else if ([underlayFactoryCase respondsToSelector:@selector(propertiesWithGraphicsQuality:)]) { underlayPropertiesCase = [underlayFactoryCase propertiesWithGraphicsQuality:100]; }
 
     self.blurRadiusCase = [underlayPropertiesCase respondsToSelector:@selector(blurRadius)] ? [underlayPropertiesCase blurRadius] : 0.0;
@@ -156,51 +165,47 @@ static void LBSetNotificationBlurRadiusCase(LBNotificationsView *notificationsVi
 
     LBSetNotificationBlurRadiusCase(self, 0.0);
 
-    [self attachNotificationBackground];
-
-    self.tintViewCase = [[UIView alloc] initWithFrame:self.backdropViewCase.bounds];
+    self.tintViewCase = [[UIView alloc] initWithFrame:self.bounds];
     self.tintViewCase.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.tintViewCase.userInteractionEnabled = NO;
     self.tintViewCase.backgroundColor = tintColorCase;
     self.tintViewCase.alpha = 0.0;
-    [self.backdropViewCase addSubview:self.tintViewCase];
+
+    [self attachNotificationBackground];
 }
 
 - (void)attachNotificationBackground {
     UIView *dashboardViewCase = self.dashboardViewCase;
-    if (!dashboardViewCase || !self.backdropViewCase) {
-        return;
-    }
+    if (!dashboardViewCase || !self.backdropViewCase || !self.tintViewCase) { return; }
 
     UIView *backgroundContainerCase = [dashboardViewCase respondsToSelector:@selector(slideableContentView)] ? [(id)dashboardViewCase slideableContentView] : nil;
     backgroundContainerCase = backgroundContainerCase ?: dashboardViewCase;
 
-    if (self.backdropViewCase.superview != backgroundContainerCase) {
-        [self.backdropViewCase removeFromSuperview];
-        [backgroundContainerCase insertSubview:self.backdropViewCase atIndex:0];
-    }
+    if (self.backdropViewCase.superview != backgroundContainerCase) { [self.backdropViewCase removeFromSuperview]; }
+    if (self.tintViewCase.superview != backgroundContainerCase) { [self.tintViewCase removeFromSuperview]; }
 
-    self.backdropViewCase.frame = backgroundContainerCase.bounds;
+    [backgroundContainerCase insertSubview:self.backdropViewCase atIndex:0];
+    [backgroundContainerCase insertSubview:self.tintViewCase aboveSubview:self.backdropViewCase];
+
+    CGRect backgroundFrameCase = backgroundContainerCase.bounds;
+    self.backdropViewCase.frame = backgroundFrameCase;
+    self.tintViewCase.frame = backgroundFrameCase;
 }
 
 // Applies the visible or hidden notification background state immediately.
 - (void)applyNotificationBackgroundVisible:(BOOL)visibleCase {
-    if (visibleCase) {
-        LBSetNotificationBlurRadiusCase(self, self.blurRadiusCase);
+    BOOL effectiveVisibleCase = visibleCase || self.passcodeBackgroundPinnedCase;
 
-        self.backdropViewCase.alpha = 1.0;
-        self.tintViewCase.alpha = self.tintAlphaCase;
-        return;
-    }
+    LBSetNotificationBlurRadiusCase(self, effectiveVisibleCase ? self.blurRadiusCase : 0.0);
 
-    LBSetNotificationBlurRadiusCase(self, 0.0);
-
-    self.backdropViewCase.alpha = 0.0;
-    self.tintViewCase.alpha = 0.0;
+    self.backdropViewCase.alpha = effectiveVisibleCase ? 1.0 : 0.0;
+    self.tintViewCase.alpha = effectiveVisibleCase ? self.tintAlphaCase : 0.0;
 }
 
 - (void)setNotificationBackgroundVisible:(BOOL)visibleCase animated:(BOOL)animatedCase {
     if (!self.backdropViewCase) { return; }
+
+    self.notificationBackgroundVisibleCase = visibleCase;
 
     if (!animatedCase) {
         [self applyNotificationBackgroundVisible:visibleCase];
@@ -226,7 +231,10 @@ static void LBSetNotificationBlurRadiusCase(LBNotificationsView *notificationsVi
 }
 
 - (void)dealloc {
+    if (self.passcodeBackgroundPinnedCase) { lbNotificationBackgroundOwnsPasscodeBlurCase = NO; }
+
     [self.backdropViewCase removeFromSuperview];
+    [self.tintViewCase removeFromSuperview];
     lbDetachNotificationConversionControllerCase(self.notificationControllerCase);
     [self.notificationControllerCase setIsOnscreen:NO];
     [self.notificationControllerCase prepareForTeardown];
@@ -240,6 +248,23 @@ static LBNotificationsView *LBNotificationsViewForDashboard(UIView *dashboardVie
     return (LBNotificationsView *)LBLockScreenViewForDashboard(dashboardViewCase, lbNotificationsViewAssociationKeyCase, [LBNotificationsView class]);
 }
 
+void LBUpdateNotificationBackgroundForPasscodeProgress(UIView *dashboardViewCase, CGFloat progressCase) {
+    LBNotificationsView *notificationsViewCase = LBNotificationsViewForDashboard(dashboardViewCase);
+    if (!notificationsViewCase) {
+        lbNotificationBackgroundOwnsPasscodeBlurCase = NO;
+        return;
+    }
+
+    progressCase = MAX(0.0, MIN(1.0, progressCase));
+    if (progressCase > 0.001 && notificationsViewCase.notificationBackgroundVisibleCase) { notificationsViewCase.passcodeBackgroundPinnedCase = YES; }
+    else if (progressCase <= 0.001) { notificationsViewCase.passcodeBackgroundPinnedCase = NO; }
+
+    lbNotificationBackgroundOwnsPasscodeBlurCase = notificationsViewCase.passcodeBackgroundPinnedCase;
+    [notificationsViewCase applyNotificationBackgroundVisible:notificationsViewCase.notificationBackgroundVisibleCase];
+}
+
+BOOL LBNotificationBackgroundOwnsPasscodeBlur(void) { return lbNotificationBackgroundOwnsPasscodeBlurCase; }
+
 // Creates and attaches the restored notification list to the active dashboard.
 static void LBInstallNotificationsView(UIView *dashboardViewCase) {
     if (!dashboardViewCase.window) {
@@ -247,14 +272,12 @@ static void LBInstallNotificationsView(UIView *dashboardViewCase) {
     }
 
     LBNotificationsView *notificationsViewCase = LBNotificationsViewForDashboard(dashboardViewCase);
-
-    if (!notificationsViewCase) {
-        notificationsViewCase = [[LBNotificationsView alloc] initWithFrame:dashboardViewCase.bounds dashboardView:dashboardViewCase];
-    }
+    if (!notificationsViewCase) { notificationsViewCase = [[LBNotificationsView alloc] initWithFrame:dashboardViewCase.bounds dashboardView:dashboardViewCase]; }
 
     notificationsViewCase.dashboardViewCase = dashboardViewCase;
     notificationsViewCase.notificationDelegateCase.dashboardViewCase = dashboardViewCase;
     LBAttachLockScreenView(notificationsViewCase, dashboardViewCase, lbNotificationsViewAssociationKeyCase);
+    [notificationsViewCase attachNotificationBackground];
 }
 
 // Hides the native iOS notification list while Lockback is enabled.
@@ -269,6 +292,23 @@ static void LBSetDashboardNotificationsHidden(UIViewController *viewControllerCa
 
 // Keeps the native list hidden and the restored iOS list attached through dashboard lifecycle changes.
 %group LBNotificationsView
+
+%hook SBLockScreenNotificationCell
+
+- (void)layoutSubviews {
+    %orig;
+
+    if (!LBLockbackEnabled()) { return; }
+
+    SBLockScreenNotificationCell *notificationCellCase = (SBLockScreenNotificationCell *)self;
+    UIScrollView *contentScrollViewCase = [notificationCellCase respondsToSelector:@selector(contentScrollView)] ? [notificationCellCase contentScrollView] : nil;
+    if (![contentScrollViewCase isKindOfClass:[UIScrollView class]]) { return; }
+
+    contentScrollViewCase.scrollEnabled = NO;
+    contentScrollViewCase.panGestureRecognizer.enabled = NO;
+}
+
+%end
 
 %hook SBDashBoardNotificationListViewController
 

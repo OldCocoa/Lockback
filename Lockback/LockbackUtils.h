@@ -15,6 +15,7 @@
 - (instancetype)initWithWallpaperVariant:(NSInteger)wallpaperVariantCase;
 - (UIView *)mainPageView;
 - (UIView *)slideableContentView;
+- (id)dashBoardViewController;
 @end
 
 typedef void (*LBLockScreenInstaller)(UIView *dashboardViewCase);
@@ -58,9 +59,7 @@ static inline UIView *LBLockScreenContentView(UIView *dashboardViewCase) {
 }
 
 // Stores a Lockback object on a SpringBoard object using a retained association.
-static inline void LBSetAssociatedObject(id objectCase, const void *associationKeyCase, id valueCase) {
-    objc_setAssociatedObject(objectCase, associationKeyCase, valueCase, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
+static inline void LBSetAssociatedObject(id objectCase, const void *associationKeyCase, id valueCase) { objc_setAssociatedObject(objectCase, associationKeyCase, valueCase, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
 
 // Stores the same replacement view on both the dashboard and its current content view.
 static inline void LBStoreLockScreenView(UIView *lockScreenViewCase, UIView *dashboardViewCase, UIView *contentViewCase, const void *associationKeyCase) {
@@ -82,7 +81,7 @@ static inline UIView *LBLockScreenViewForDashboard(UIView *dashboardViewCase, co
         UIView *subviewCase = contentSubviewsCase[subviewIndexCase];
         if (![subviewCase isKindOfClass:viewClassCase]) { continue; }
 
-        if (!lockScreenViewCase) { lockScreenViewCase = subviewCase; } 
+        if (!lockScreenViewCase) { lockScreenViewCase = subviewCase; }
         else if (subviewCase != lockScreenViewCase) { [subviewCase removeFromSuperview]; }
     }
 

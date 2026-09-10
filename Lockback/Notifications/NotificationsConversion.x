@@ -9,10 +9,16 @@
 - (void)observer:(id)observerCase removeBulletin:(id)bulletinCase;
 @end
 
+@interface SBNotificationCenterDestination : NSObject
+- (id)notificationListViewController;
+@end
+
 @interface NSObject (LBNotificationsConversionPrivateMethodsCase)
 - (id)bulletin;
 - (id)bulletinID;
 - (id)defaultAction;
+- (id)notificationRequest;
+- (id)notificationRequestsPassingTest:(BOOL (^)(id notificationRequestCase))testCase;
 - (void)notificationListViewController:(id)listViewControllerCase requestPermissionToExecuteAction:(id)actionCase forNotificationRequest:(id)notificationRequestCase withParameters:(id)parametersCase completion:(void (^)(BOOL permittedCase))completionCase;
 - (void)notificationListViewController:(id)listViewControllerCase requestsExecuteAction:(id)actionCase forNotificationRequest:(id)notificationRequestCase withParameters:(id)parametersCase completion:(void (^)(BOOL successCase))completionCase;
 @end
@@ -22,12 +28,15 @@
 @property (nonatomic, strong) NSMutableDictionary *notificationRequestsByIdentifierCase;
 @property (nonatomic, weak) SBLockScreenNotificationListController *notificationControllerCase;
 @property (nonatomic, weak) id dashboardNotificationControllerCase;
+@property (nonatomic, weak) SBNotificationCenterDestination *notificationCenterDestinationCase;
 + (instancetype)sharedBridgeCase;
 - (void)attachNotificationControllerCase:(SBLockScreenNotificationListController *)notificationControllerCase;
 - (void)detachNotificationControllerCase:(SBLockScreenNotificationListController *)notificationControllerCase;
 - (void)postNotificationRequestCase:(id)notificationRequestCase;
 - (void)updateNotificationRequestCase:(id)notificationRequestCase;
 - (void)withdrawNotificationRequestCase:(id)notificationRequestCase;
+- (void)synchronizeNotificationRequestsFromDashboardControllerCase:(id)dashboardNotificationControllerCase;
+- (void)synchronizeNotificationRequestsFromNotificationCenterDestinationCase:(SBNotificationCenterDestination *)notificationCenterDestinationCase;
 - (BOOL)executeDefaultActionForBulletinCase:(id)bulletinCase completionCase:(void (^)(BOOL successCase))completionCase;
 @end
 
@@ -48,6 +57,36 @@ static NSString *lbNotificationRequestIdentifierCase(id notificationRequestCase)
     id bulletinCase = lbBulletinForNotificationRequestCase(notificationRequestCase);
     id bulletinIdentifierCase = [bulletinCase respondsToSelector:@selector(bulletinID)] ? [bulletinCase bulletinID] : nil;
     return [bulletinIdentifierCase isKindOfClass:[NSString class]] ? bulletinIdentifierCase : [bulletinIdentifierCase description];
+}
+
+// Gets the native iOS notification list that owns the requests currently shown by the dashboard.
+static id lbDashboardNotificationListCase(id dashboardNotificationControllerCase) {
+    if (!dashboardNotificationControllerCase) { return nil; }
+
+    Ivar listViewControllerIvarCase = class_getInstanceVariable([dashboardNotificationControllerCase class], "_listViewController");
+    return listViewControllerIvarCase ? object_getIvar(dashboardNotificationControllerCase, listViewControllerIvarCase) : nil;
+}
+
+// Resolves a native list object back to its notification request when necessary.
+static id lbNotificationRequestFromListObjectCase(id notificationListObjectCase) {
+    if (lbBulletinForNotificationRequestCase(notificationListObjectCase)) { return notificationListObjectCase; }
+    return [notificationListObjectCase respondsToSelector:@selector(notificationRequest)] ? [notificationListObjectCase notificationRequest] : nil;
+}
+
+// Gets all notification requests currently owned by a native iOS notification list.
+static NSArray *lbNotificationRequestsFromListCase(id notificationListCase) {
+    if (![notificationListCase respondsToSelector:@selector(notificationRequestsPassingTest:)]) { return nil; }
+
+    id notificationListObjectsCase = [notificationListCase notificationRequestsPassingTest:^BOOL(id notificationRequestCase) { return notificationRequestCase != nil; }];
+    if (![notificationListObjectsCase conformsToProtocol:@protocol(NSFastEnumeration)]) { return nil; }
+
+    NSMutableArray *notificationRequestsCase = [NSMutableArray array];
+    for (id notificationListObjectCase in notificationListObjectsCase) {
+        id notificationRequestCase = lbNotificationRequestFromListObjectCase(notificationListObjectCase);
+        if (notificationRequestCase) { [notificationRequestsCase addObject:notificationRequestCase]; }
+    }
+
+    return notificationRequestsCase;
 }
 
 @implementation LBNotificationRequestBridgeCase
@@ -85,6 +124,9 @@ static NSString *lbNotificationRequestIdentifierCase(id notificationRequestCase)
     NSArray *notificationRequestsCase = self.notificationRequestsByIdentifierCase.allValues;
 
     for (NSUInteger requestIndexCase = 0; requestIndexCase < notificationRequestsCase.count; requestIndexCase++) { [self addNotificationRequestToControllerCase:notificationRequestsCase[requestIndexCase]]; }
+
+    if (LBNotificationCenterMirroringEnabled()) { [self synchronizeNotificationRequestsFromNotificationCenterDestinationCase:self.notificationCenterDestinationCase]; }
+    else { [self synchronizeNotificationRequestsFromDashboardControllerCase:self.dashboardNotificationControllerCase]; }
 }
 
 - (void)detachNotificationControllerCase:(SBLockScreenNotificationListController *)notificationControllerCase { if (self.notificationControllerCase == notificationControllerCase) { self.notificationControllerCase = nil; } }
@@ -140,6 +182,45 @@ static NSString *lbNotificationRequestIdentifierCase(id notificationRequestCase)
     if (notificationControllerCase && bulletinCase) { [notificationControllerCase observer:lbObserverForNotificationRequestCase(storedNotificationRequestCase ?: notificationRequestCase) removeBulletin:bulletinCase]; }
 }
 
+// Replays the requests already owned by iOS into the restored list when the lock screen is rebuilt.
+- (void)synchronizeNotificationRequestsFromDashboardControllerCase:(id)dashboardNotificationControllerCase {
+    if (!dashboardNotificationControllerCase || LBNotificationCenterMirroringEnabled()) { return; }
+
+    self.dashboardNotificationControllerCase = dashboardNotificationControllerCase;
+
+    NSArray *notificationRequestsCase = lbNotificationRequestsFromListCase(lbDashboardNotificationListCase(dashboardNotificationControllerCase));
+    for (NSUInteger requestIndexCase = 0; requestIndexCase < notificationRequestsCase.count; requestIndexCase++) { [self updateNotificationRequestCase:notificationRequestsCase[requestIndexCase]]; }
+}
+
+// Rebuilds the restored list from Notification Center and removes requests that Notification Center no longer owns.
+- (void)synchronizeNotificationRequestsFromNotificationCenterDestinationCase:(SBNotificationCenterDestination *)notificationCenterDestinationCase {
+    if (!notificationCenterDestinationCase || !LBNotificationCenterMirroringEnabled()) { return; }
+
+    self.notificationCenterDestinationCase = notificationCenterDestinationCase;
+
+    NSArray *notificationRequestsCase = lbNotificationRequestsFromListCase([notificationCenterDestinationCase notificationListViewController]);
+    if (!notificationRequestsCase) { return; }
+
+    NSMutableSet *notificationIdentifiersCase = [NSMutableSet set];
+    for (NSUInteger requestIndexCase = 0; requestIndexCase < notificationRequestsCase.count; requestIndexCase++) {
+        id notificationRequestCase = notificationRequestsCase[requestIndexCase];
+        
+        NSString *notificationIdentifierCase = lbNotificationRequestIdentifierCase(notificationRequestCase);
+        if (notificationIdentifierCase) { [notificationIdentifiersCase addObject:notificationIdentifierCase]; }
+
+        [self updateNotificationRequestCase:notificationRequestCase];
+    }
+
+    NSArray *storedNotificationIdentifiersCase = self.notificationRequestsByIdentifierCase.allKeys;
+    for (NSUInteger identifierIndexCase = 0; identifierIndexCase < storedNotificationIdentifiersCase.count; identifierIndexCase++) {
+        NSString *notificationIdentifierCase = storedNotificationIdentifiersCase[identifierIndexCase];
+        if ([notificationIdentifiersCase containsObject:notificationIdentifierCase]) { continue; }
+
+        id notificationRequestCase = self.notificationRequestsByIdentifierCase[notificationIdentifierCase];
+        [self withdrawNotificationRequestCase:notificationRequestCase];
+    }
+}
+
 // Gets the action from an iOS notification and puts it back into the bulletin for proper "slide to view" action.
 - (BOOL)executeDefaultActionForBulletinCase:(id)bulletinCase completionCase:(void (^)(BOOL successCase))completionCase {
     id bulletinIdentifierCase = [bulletinCase respondsToSelector:@selector(bulletinID)] ? [bulletinCase bulletinID] : nil;
@@ -162,7 +243,7 @@ static NSString *lbNotificationRequestIdentifierCase(id notificationRequestCase)
     };
 
     [dashboardNotificationControllerCase notificationListViewController:nil requestPermissionToExecuteAction:defaultActionCase forNotificationRequest:notificationRequestCase withParameters:nil completion:^(BOOL permittedCase) {
-        if (permittedCase) { executeActionCase(); } 
+        if (permittedCase) { executeActionCase(); }
         else if (completionCase) { completionCase(NO); }
     }];
 
@@ -188,6 +269,40 @@ BOOL lbExecuteConvertedNotificationActionCase(id bulletinCase, void (^completion
 
 %end
 
+%hook SBNotificationCenterDestination
+
+- (id)init {
+    id notificationCenterDestinationCase = %orig;
+    [LBNotificationRequestBridgeCase sharedBridgeCase].notificationCenterDestinationCase = notificationCenterDestinationCase;
+    return notificationCenterDestinationCase;
+}
+
+- (void)postNotificationRequest:(id)notificationRequestCase forCoalescedNotification:(id)coalescedNotificationCase {
+    %orig;
+    [LBNotificationRequestBridgeCase sharedBridgeCase].notificationCenterDestinationCase = (SBNotificationCenterDestination *)self;
+    if (LBLockbackEnabled() && LBNotificationCenterMirroringEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] postNotificationRequestCase:notificationRequestCase]; }
+}
+
+- (void)modifyNotificationRequest:(id)notificationRequestCase forCoalescedNotification:(id)coalescedNotificationCase {
+    %orig;
+    [LBNotificationRequestBridgeCase sharedBridgeCase].notificationCenterDestinationCase = (SBNotificationCenterDestination *)self;
+    if (LBLockbackEnabled() && LBNotificationCenterMirroringEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] updateNotificationRequestCase:notificationRequestCase]; }
+}
+
+- (void)withdrawNotificationRequest:(id)notificationRequestCase forCoalescedNotification:(id)coalescedNotificationCase {
+    %orig;
+    [LBNotificationRequestBridgeCase sharedBridgeCase].notificationCenterDestinationCase = (SBNotificationCenterDestination *)self;
+    if (LBLockbackEnabled() && LBNotificationCenterMirroringEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] withdrawNotificationRequestCase:notificationRequestCase]; }
+}
+
+- (void)setNotificationListViewController:(id)notificationListViewControllerCase {
+    %orig;
+    [LBNotificationRequestBridgeCase sharedBridgeCase].notificationCenterDestinationCase = (SBNotificationCenterDestination *)self;
+    if (LBLockbackEnabled() && LBNotificationCenterMirroringEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] synchronizeNotificationRequestsFromNotificationCenterDestinationCase:(SBNotificationCenterDestination *)self]; }
+}
+
+%end
+
 %hook SBDashBoardNotificationListViewController
 
 - (id)initWithNibName:(NSString *)nibNameCase bundle:(NSBundle *)bundleCase {
@@ -199,19 +314,29 @@ BOOL lbExecuteConvertedNotificationActionCase(id bulletinCase, void (^completion
 - (void)postNotificationRequest:(id)notificationRequestCase forCoalescedNotification:(id)coalescedNotificationCase {
     %orig;
     [LBNotificationRequestBridgeCase sharedBridgeCase].dashboardNotificationControllerCase = self;
-    if (LBLockbackEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] postNotificationRequestCase:notificationRequestCase]; }
+    if (LBLockbackEnabled() && !LBNotificationCenterMirroringEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] postNotificationRequestCase:notificationRequestCase]; }
 }
 
 - (void)updateNotificationRequest:(id)notificationRequestCase forCoalescedNotification:(id)coalescedNotificationCase {
     %orig;
     [LBNotificationRequestBridgeCase sharedBridgeCase].dashboardNotificationControllerCase = self;
-    if (LBLockbackEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] updateNotificationRequestCase:notificationRequestCase]; }
+    if (LBLockbackEnabled() && !LBNotificationCenterMirroringEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] updateNotificationRequestCase:notificationRequestCase]; }
 }
 
 - (void)withdrawNotificationRequest:(id)notificationRequestCase forCoalescedNotification:(id)coalescedNotificationCase {
     %orig;
     [LBNotificationRequestBridgeCase sharedBridgeCase].dashboardNotificationControllerCase = self;
-    if (LBLockbackEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] withdrawNotificationRequestCase:notificationRequestCase]; }
+    if (LBLockbackEnabled() && !LBNotificationCenterMirroringEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] withdrawNotificationRequestCase:notificationRequestCase]; }
+}
+
+- (void)viewDidAppear:(BOOL)animatedCase {
+    %orig;
+    if (LBLockbackEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] synchronizeNotificationRequestsFromDashboardControllerCase:self]; }
+}
+
+- (void)rebuildEverythingForReason:(id)reasonCase {
+    %orig;
+    if (LBLockbackEnabled()) { [[LBNotificationRequestBridgeCase sharedBridgeCase] synchronizeNotificationRequestsFromDashboardControllerCase:self]; }
 }
 
 %end

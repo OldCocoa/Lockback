@@ -131,7 +131,6 @@ static void LBSetCameraSlideTarget(id slideControllerCase) {
     if ([slideControllerCase respondsToSelector:@selector(_setTargetApp:withAppSuggestion:)]) { [slideControllerCase _setTargetApp:cameraApplicationCase withAppSuggestion:nil]; }
 }
 
-
 %group LBCameraGrabber
 
 %hook SBDashBoardSlideUpToAppController

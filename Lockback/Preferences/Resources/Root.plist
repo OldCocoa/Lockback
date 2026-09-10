@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>items</key>
+    <array>
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>label</key>
+            <string>General settings</string>
+        </dict>
+        <dict>
+            <key>cell</key>
+            <string>PSSwitchCell</string>
+            <key>default</key>
+            <true/>
+            <key>get</key>
+            <string>readPreferenceValueCase:</string>
+            <key>key</key>
+            <string>Enabled</string>
+            <key>label</key>
+            <string>Enable Lockback</string>
+            <key>set</key>
+            <string>setPreferenceValueCase:specifier:</string>
+        </dict>
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>label</key>
+            <string>Quality-of-life</string>
+        </dict>
+        <dict>
+            <key>cell</key>
+            <string>PSSwitchCell</string>
+            <key>default</key>
+            <true/>
+            <key>get</key>
+            <string>readPreferenceValueCase:</string>
+            <key>key</key>
+            <string>DisableHomeButtonUnlock</string>
+            <key>label</key>
+            <string>Disable Home Button Unlock</string>
+            <key>set</key>
+            <string>setPreferenceValueCase:specifier:</string>
+        </dict>
+        <dict>
+            <key>cell</key>
+            <string>PSSwitchCell</string>
+            <key>default</key>
+            <false/>
+            <key>get</key>
+            <string>readPreferenceValueCase:</string>
+            <key>key</key>
+            <string>NotificationCenterMirroring</string>
+            <key>label</key>
+            <string>Mirror Notification Center</string>
+            <key>set</key>
+            <string>setPreferenceValueCase:specifier:</string>
+        </dict>
+    </array>
+    <key>title</key>
+    <string>Lockback</string>
+</dict>
+</plist>

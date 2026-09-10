@@ -2,7 +2,7 @@
 
 #import <UIKit/UIKit.h>
 #import <math.h>
-#import "LockbackUtils.h"
+#import "TimeDateShared.h"
 
 @interface NSObject (LBTimeDatePrivateMethods)
 - (CGFloat)_baselineOffsetFromBottom;
@@ -16,7 +16,6 @@ typedef struct {
     CGFloat dateBaselineOffsetCase;
 } LBTimeDateMetrics;
 
-static const void *lbTimeDateViewAssociationKeyCase = &lbTimeDateViewAssociationKeyCase;
 static NSString *const lbTimeLabelAccessibilityIdentifierCase = @"LockScreenTimeLabel";
 static NSString *const lbDateLabelAccessibilityIdentifierCase = @"LockScreenDateLabel";
 
@@ -85,10 +84,7 @@ static LBTimeDateMetrics LBMetricsForCurrentScreen(void) {
 }
 
 static UIFont *LBFontByAddingFeatures(UIFont *fontCase, NSArray *featureSettingsCase, CGFloat fontSizeCase) {
-    UIFontDescriptor *fontDescriptorCase = [fontCase.fontDescriptor fontDescriptorByAddingAttributes:@{
-        UIFontDescriptorFeatureSettingsAttribute: featureSettingsCase,
-    }];
-
+    UIFontDescriptor *fontDescriptorCase = [fontCase.fontDescriptor fontDescriptorByAddingAttributes:@{ UIFontDescriptorFeatureSettingsAttribute: featureSettingsCase, }];
     return [UIFont fontWithDescriptor:fontDescriptorCase size:fontSizeCase];
 }
 
@@ -201,27 +197,11 @@ static UILabel *LBNewTimeDateLabel(NSString *accessibilityIdentifierCase) {
     return labelCase;
 }
 
-// Owns and lays out the recreated lock screen clock and date.
-@interface LBTimeDateView : UIView
-@property (nonatomic, strong) UILabel *timeLabelCase;
-@property (nonatomic, strong) UILabel *dateLabelCase;
-@property (nonatomic, strong) NSDateFormatter *timeFormatterCase;
-@property (nonatomic, strong) NSDateFormatter *dateFormatterCase;
-// Reapplies the appropriate fonts when the device or text-size metrics change.
-- (void)updateLabelFonts;
-// Rebuilds the localized time and date formatters.
-- (void)refreshFormatters;
-// Updates the visible time, date, and their accessibility labels.
-- (void)setDate:(NSDate *)dateCase;
-@end
-
 @implementation LBTimeDateView
 
 - (instancetype)initWithFrame:(CGRect)frameCase {
     self = [super initWithFrame:frameCase];
-    if (!self) {
-        return nil;
-    }
+    if (!self) { return nil; }
 
     self.backgroundColor = [UIColor clearColor];
 
@@ -257,9 +237,7 @@ static UILabel *LBNewTimeDateLabel(NSString *accessibilityIdentifierCase) {
 }
 
 - (void)setDate:(NSDate *)dateCase {
-    if (!dateCase) {
-        return;
-    }
+    if (!dateCase) { return; }
 
     NSString *timeTextCase = [self.timeFormatterCase stringFromDate:dateCase];
     NSString *dateTextCase = [self.dateFormatterCase stringFromDate:dateCase];
@@ -282,142 +260,7 @@ static UILabel *LBNewTimeDateLabel(NSString *accessibilityIdentifierCase) {
     CGFloat containerWidthCase = CGRectGetWidth(self.bounds);
 
     LBPositionLabelAtBaseline(self.timeLabelCase, containerWidthCase, metricsCase.timeBaselineCase);
-    LBPositionLabelAtBaseline(
-        self.dateLabelCase,
-        containerWidthCase,
-        metricsCase.timeBaselineCase + metricsCase.dateBaselineOffsetCase
-    );
+    LBPositionLabelAtBaseline(self.dateLabelCase, containerWidthCase, metricsCase.timeBaselineCase + metricsCase.dateBaselineOffsetCase);
 }
 
 @end
-
-// Keeps all active lock screen time/date views synchronized with the system clock, locale, and time zone.
-@interface LBTimeDateUpdater : NSObject
-@property (nonatomic, strong) NSHashTable *dateViewsCase;
-@property (nonatomic, strong) NSTimer *minuteUpdateTimerCase;
-// Returns the single updater shared by every dashboard instance.
-+ (instancetype)sharedUpdater;
-- (void)addDateView:(LBTimeDateView *)dateViewCase;
-- (void)updateDateViewsRefreshingFormatters:(BOOL)refreshFormattersCase;
-// Schedules the next refresh exactly on the next minute boundary.
-- (void)scheduleMinuteUpdate;
-@end
-
-@implementation LBTimeDateUpdater
-
-+ (instancetype)sharedUpdater {
-    static LBTimeDateUpdater *sharedUpdaterCase;
-    static dispatch_once_t onceTokenCase;
-
-    dispatch_once(&onceTokenCase, ^{ sharedUpdaterCase = [self new]; });
-    return sharedUpdaterCase;
-}
-
-- (instancetype)init {
-    self = [super init];
-    if (!self) {
-        return nil;
-    }
-
-    self.dateViewsCase = [NSHashTable weakObjectsHashTable];
-
-    NSNotificationCenter *notificationCenterCase = [NSNotificationCenter defaultCenter];
-    NSArray *notificationsCase = @[
-        NSSystemClockDidChangeNotification,
-        NSSystemTimeZoneDidChangeNotification,
-        NSCurrentLocaleDidChangeNotification,
-        UIApplicationSignificantTimeChangeNotification,
-    ];
-
-    for (NSUInteger notificationIndexCase = 0; notificationIndexCase < notificationsCase.count; notificationIndexCase++) {
-        [notificationCenterCase addObserver:self selector:@selector(environmentDidChange:) name:notificationsCase[notificationIndexCase] object:nil];
-    }
-
-    [self scheduleMinuteUpdate];
-    return self;
-}
-
-- (void)addDateView:(LBTimeDateView *)dateViewCase {
-    if (!dateViewCase) { return; }
-
-    [self.dateViewsCase addObject:dateViewCase];
-    [dateViewCase setDate:[NSDate date]];
-}
-
-- (void)updateDateViewsRefreshingFormatters:(BOOL)refreshFormattersCase {
-    NSDate *dateCase = [NSDate date];
-    NSArray *dateViewsCase = self.dateViewsCase.allObjects;
-
-    for (NSUInteger dateViewIndexCase = 0; dateViewIndexCase < dateViewsCase.count; dateViewIndexCase++) {
-        LBTimeDateView *dateViewCase = dateViewsCase[dateViewIndexCase];
-        if (refreshFormattersCase) { [dateViewCase refreshFormatters]; }
-
-        [dateViewCase setDate:dateCase];
-    }
-}
-
-- (void)scheduleMinuteUpdate {
-    [self.minuteUpdateTimerCase invalidate];
-
-    NSTimeInterval referenceTimeCase = [[NSDate date] timeIntervalSinceReferenceDate];
-    NSTimeInterval nextMinuteReferenceTimeCase = (floor(referenceTimeCase / 60.0) + 1.0) * 60.0;
-
-    NSDate *nextMinuteDateCase = [NSDate dateWithTimeIntervalSinceReferenceDate: nextMinuteReferenceTimeCase];
-
-    self.minuteUpdateTimerCase = [[NSTimer alloc] initWithFireDate:nextMinuteDateCase interval:0.0 target:self selector:@selector(minuteDidChange:) userInfo:nil repeats:NO];
-    [[NSRunLoop mainRunLoop] addTimer:self.minuteUpdateTimerCase forMode:NSRunLoopCommonModes];
-}
-
-- (void)minuteDidChange:(NSTimer *)timerCase {
-    [self updateDateViewsRefreshingFormatters:NO];
-    [self scheduleMinuteUpdate];
-}
-
-- (void)environmentDidChange:(NSNotification *)notificationCase {
-    [self updateDateViewsRefreshingFormatters:YES];
-    [self scheduleMinuteUpdate];
-}
-
-@end
-
-// Returns the Lockback time/date view associated with this dashboard.
-static LBTimeDateView *LBTimeDateViewForDashboard(UIView *dashboardViewCase) {
-    return (LBTimeDateView *)LBLockScreenViewForDashboard(dashboardViewCase, lbTimeDateViewAssociationKeyCase, [LBTimeDateView class]);
-}
-
-// Creates and attaches the recreated time/date view to the active lock screen dashboard.
-static void LBInstallTimeDateView(UIView *dashboardViewCase) {
-    if (!dashboardViewCase.window) {
-        return;
-    }
-
-    LBTimeDateView *timeDateViewCase = LBTimeDateViewForDashboard(dashboardViewCase);
-    if (!timeDateViewCase) {
-        timeDateViewCase = [[LBTimeDateView alloc] initWithFrame:dashboardViewCase.bounds];
-        timeDateViewCase.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-
-        [[LBTimeDateUpdater sharedUpdater] addDateView:timeDateViewCase];
-    }
-
-    LBAttachLockScreenView(timeDateViewCase, dashboardViewCase, lbTimeDateViewAssociationKeyCase);
-}
-
-%group LBTimeDate
-
-%hook SBDashBoardView
-
-- (void)didMoveToWindow {
-    %orig;
-    LBUpdateLockScreenFeature((UIView *)self, lbTimeDateViewAssociationKeyCase, YES, LBInstallTimeDateView);
-}
-
-- (void)layoutSubviews {
-    %orig;
-    LBUpdateLockScreenFeature((UIView *)self, lbTimeDateViewAssociationKeyCase, NO, LBInstallTimeDateView);
-}
-
-%end
-
-%end
-
-void LBInitializeTimeDate(void) { %init(LBTimeDate); }

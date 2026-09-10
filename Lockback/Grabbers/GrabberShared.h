@@ -1,9 +1,12 @@
+// This exposes the shared grabber views, state, and appearance helpers.
+
 #ifndef GrabberShared_h
 #define GrabberShared_h
 
 #import <UIKit/UIKit.h>
 #import "../LockbackUtils.h"
 
+// Declares the private SpringBoard methods shared by the grabber implementation.
 @interface NSObject (LBGrabberPrivateMethods)
 - (instancetype)initWithColor:(UIColor *)colorCase;
 - (instancetype)initWithAdditionalTopPadding:(BOOL)additionalTopPaddingCase invertVerticalInsets:(BOOL)invertVerticalInsetsCase;
@@ -24,12 +27,15 @@
 - (UIView *)tintViewWithFrame:(CGRect)viewFrameCase;
 - (id)cameraApplication;
 - (BOOL)isShowingMediaControls;
+- (NSArray *)pageViews;
+- (id)pageViewController;
 - (void)_setTargetApp:(id)targetAppCase withAppSuggestion:(id)appSuggestionCase;
 - (void)_setState:(NSUInteger)stateCase;
 - (void)_activateTargetAppAnimated:(BOOL)animatedCase;
 - (void)_activateApp:(id)applicationCase withAppInfo:(id)appInfoCase andURL:(NSURL *)urlCase animated:(BOOL)animatedCase;
 @end
 
+// Owns the recreated top, bottom, and camera grabber views.
 @interface LBGrabberOverlayView : UIView
 @property (nonatomic, weak) UIView *dashboardViewCase;
 @property (nonatomic, strong) UIView *topGrabberViewCase;
@@ -40,9 +46,11 @@
 @property (nonatomic, strong) UIView *cameraGrabberBackgroundViewCase;
 @property (nonatomic) CGFloat scrollProgressCase;
 @property (nonatomic) CGFloat cameraOffsetCase;
+@property (nonatomic) CGFloat cameraPageOffsetCase;
 - (instancetype)initWithFrame:(CGRect)viewFrameCase dashboardView:(UIView *)dashboardViewCase;
 - (void)updateGrabberAppearance;
 - (void)updateGrabberScrollProgress:(CGFloat)scrollProgressCase;
+- (void)updateCameraPageOffset:(CGFloat)cameraPageOffsetCase;
 - (void)updateCameraOffset:(CGFloat)cameraOffsetCase;
 - (void)updateMediaControlsVisibility:(BOOL)visibleCase;
 @end
