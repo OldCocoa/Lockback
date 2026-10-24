@@ -4,6 +4,7 @@
 #import <math.h>
 #import "../LockbackUtils.h"
 #import "TimeDateShared.h"
+#import "../MediaControls/MediaControlsShared.h"
 
 static const void *lbTimeDateViewAssociationKeyCase = &lbTimeDateViewAssociationKeyCase;
 
@@ -113,7 +114,20 @@ static void LBInstallTimeDateView(UIView *dashboardViewCase) {
     }
 
     [timeDateViewCase setDate:[NSDate date]];
+    timeDateViewCase.alpha = LBMediaControlsVisible() ? 0.0 : 1.0;
     LBAttachLockScreenView(timeDateViewCase, dashboardViewCase, lbTimeDateViewAssociationKeyCase);
+}
+
+void LBSetTimeDateHiddenForMediaControls(UIView *dashboardViewCase, BOOL hiddenCase, BOOL animatedCase) {
+    LBTimeDateView *timeDateViewCase = LBTimeDateViewForDashboard(dashboardViewCase);
+    CGFloat alphaCase = hiddenCase ? 0.0 : 1.0;
+    if (!timeDateViewCase || timeDateViewCase.alpha == alphaCase) { return; }
+
+    if (animatedCase && timeDateViewCase.window) {
+        [UIView animateWithDuration:0.25 animations:^{ timeDateViewCase.alpha = alphaCase; }];
+    } else {
+        timeDateViewCase.alpha = alphaCase;
+    }
 }
 
 %group LBTimeDate

@@ -3,6 +3,7 @@
 #import <UIKit/UIKit.h>
 #import "../LockbackUtils.h"
 #import "NotificationsShared.h"
+#import "../MediaControls/MediaControlsShared.h"
 
 @class LBNotificationsView;
 
@@ -70,6 +71,13 @@ static void LBSetNotificationBlurRadiusCase(LBNotificationsView *notificationsVi
     if ([inputSettingsCase respondsToSelector:@selector(setBlurRadius:)]) { [inputSettingsCase setBlurRadius:blurRadiusCase]; }
 }
 
+NSString *const LBNotificationListVisibilityDidChangeNotification = @"LBNotificationListVisibilityDidChangeNotification";
+static BOOL lbNotificationListVisibleCase = NO;
+
+BOOL LBNotificationListVisible(void) { return lbNotificationListVisibleCase; }
+
+static BOOL lbMediaControlsWantBackgroundCase = NO;
+
 @implementation LBNotificationsListDelegate
 
 // These callbacks are required by the iOS list controller but do not need additional handling.
@@ -79,6 +87,12 @@ static void LBSetNotificationBlurRadiusCase(LBNotificationsView *notificationsVi
 // Shows or hides the notification underlay as the restored list becomes visible.
 - (void)notificationListBecomingVisible:(BOOL)visibleCase {
     LBNotificationsView *notificationsViewCase = self.notificationsViewCase;
+
+    if (lbNotificationListVisibleCase != visibleCase) {
+        lbNotificationListVisibleCase = visibleCase;
+        [[NSNotificationCenter defaultCenter] postNotificationName:LBNotificationListVisibilityDidChangeNotification object:nil];
+    }
+
     [notificationsViewCase setNotificationBackgroundVisible:visibleCase animated:notificationsViewCase.window != nil];
 }
 
@@ -194,7 +208,7 @@ static void LBSetNotificationBlurRadiusCase(LBNotificationsView *notificationsVi
 
 // Applies the visible or hidden notification background state immediately.
 - (void)applyNotificationBackgroundVisible:(BOOL)visibleCase {
-    BOOL effectiveVisibleCase = visibleCase || self.passcodeBackgroundPinnedCase;
+    BOOL effectiveVisibleCase = visibleCase || self.passcodeBackgroundPinnedCase || lbMediaControlsWantBackgroundCase;
 
     LBSetNotificationBlurRadiusCase(self, effectiveVisibleCase ? self.blurRadiusCase : 0.0);
 
@@ -256,11 +270,19 @@ void LBUpdateNotificationBackgroundForPasscodeProgress(UIView *dashboardViewCase
     }
 
     progressCase = MAX(0.0, MIN(1.0, progressCase));
-    if (progressCase > 0.001 && notificationsViewCase.notificationBackgroundVisibleCase) { notificationsViewCase.passcodeBackgroundPinnedCase = YES; }
+    if (progressCase > 0.001 && (notificationsViewCase.notificationBackgroundVisibleCase || lbMediaControlsWantBackgroundCase)) { notificationsViewCase.passcodeBackgroundPinnedCase = YES; }
     else if (progressCase <= 0.001) { notificationsViewCase.passcodeBackgroundPinnedCase = NO; }
 
     lbNotificationBackgroundOwnsPasscodeBlurCase = notificationsViewCase.passcodeBackgroundPinnedCase;
     [notificationsViewCase applyNotificationBackgroundVisible:notificationsViewCase.notificationBackgroundVisibleCase];
+}
+
+void LBSetNotificationBackgroundForMediaControls(UIView *dashboardViewCase, BOOL visibleCase, BOOL animatedCase) {
+    BOOL changedCase = lbMediaControlsWantBackgroundCase != visibleCase;
+    lbMediaControlsWantBackgroundCase = visibleCase;
+
+    LBNotificationsView *notificationsViewCase = LBNotificationsViewForDashboard(dashboardViewCase);
+    [notificationsViewCase setNotificationBackgroundVisible:notificationsViewCase.notificationBackgroundVisibleCase animated:changedCase && animatedCase && notificationsViewCase.window != nil];
 }
 
 BOOL LBNotificationBackgroundOwnsPasscodeBlur(void) { return lbNotificationBackgroundOwnsPasscodeBlurCase; }

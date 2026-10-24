@@ -8,6 +8,8 @@
 BOOL LBLockbackEnabled(void);
 BOOL LBNotificationCenterMirroringEnabled(void);
 BOOL LBDisableHomeButtonUnlockEnabled(void);
+BOOL LBMediaControlsShowsPreviousTrack(void);
+extern NSString *const LBPreferencesDidChangeNotification;
 BOOL LBPasscodeScreenRequired(void);
 BOOL LBPresentPasscodeScreen(void);
 void LBResetSlideToUnlockAfterPasscodeCancellation(void);
@@ -20,5 +22,6 @@ void LBInitializeHomeButtonBlock(void);
 void LBInitializeDashboardPaging(void);
 void LBInitializeSlideToUnlock(void);
 void LBInitializeGrabbers(void);
+void LBInitializeMediaControls(void);
 
 #endif

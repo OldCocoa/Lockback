@@ -58,6 +58,36 @@
             <key>set</key>
             <string>setPreferenceValueCase:specifier:</string>
         </dict>
+        <dict>
+            <key>cell</key>
+            <string>PSGroupCell</string>
+            <key>label</key>
+            <string>Media controls</string>
+            <key>footerText</key>
+            <string>Button shown left of play/pause on the lock screen player.</string>
+        </dict>
+        <dict>
+            <key>cell</key>
+            <string>PSSegmentCell</string>
+            <key>default</key>
+            <integer>0</integer>
+            <key>get</key>
+            <string>readPreferenceValueCase:</string>
+            <key>key</key>
+            <string>MediaControlsLeftButton</string>
+            <key>set</key>
+            <string>setPreferenceValueCase:specifier:</string>
+            <key>validValues</key>
+            <array>
+                <integer>0</integer>
+                <integer>1</integer>
+            </array>
+            <key>validTitles</key>
+            <array>
+                <string>Heart</string>
+                <string>Previous Track</string>
+            </array>
+        </dict>
     </array>
     <key>title</key>
     <string>Lockback</string>

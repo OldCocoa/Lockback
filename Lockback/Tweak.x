@@ -6,6 +6,7 @@
 static BOOL lbLockbackEnabledCase = YES;
 static BOOL lbNotificationCenterMirroringEnabledCase = NO;
 static BOOL lbDisableHomeButtonUnlockEnabledCase = YES;
+static BOOL lbMediaControlsShowsPreviousTrackCase = NO;
 static CFStringRef const lbPreferencesDomainCase = CFSTR("com.patricktbp.lockback");
 
 static void LBReloadPreferences(void) {
@@ -19,18 +20,28 @@ static void LBReloadPreferences(void) {
     lbNotificationCenterMirroringEnabledCase = notificationCenterMirroringValueCase ? CFBooleanGetValue((CFBooleanRef)notificationCenterMirroringValueCase) : NO;
     lbDisableHomeButtonUnlockEnabledCase = disableHomeButtonUnlockValueCase ? CFBooleanGetValue((CFBooleanRef)disableHomeButtonUnlockValueCase) : YES;
 
+    CFPropertyListRef leftButtonValueCase = CFPreferencesCopyAppValue(CFSTR("MediaControlsLeftButton"), lbPreferencesDomainCase);
+    int leftButtonCase = 0;
+    if (leftButtonValueCase && CFGetTypeID(leftButtonValueCase) == CFNumberGetTypeID()) { CFNumberGetValue((CFNumberRef)leftButtonValueCase, kCFNumberIntType, &leftButtonCase); }
+    lbMediaControlsShowsPreviousTrackCase = leftButtonCase == 1;
+    if (leftButtonValueCase) { CFRelease(leftButtonValueCase); }
+
     if (enabledValueCase) { CFRelease(enabledValueCase); }
     if (notificationCenterMirroringValueCase) { CFRelease(notificationCenterMirroringValueCase); }
     if (disableHomeButtonUnlockValueCase) { CFRelease(disableHomeButtonUnlockValueCase); }
 }
 
+NSString *const LBPreferencesDidChangeNotification = @"LBPreferencesDidChangeNotification";
+
 static void LBPreferencesChanged(CFNotificationCenterRef __unused centerCase, void *__unused observerCase, CFStringRef __unused nameCase, const void *__unused objectCase, CFDictionaryRef __unused userInfoCase) {
     LBReloadPreferences();
+    [[NSNotificationCenter defaultCenter] postNotificationName:LBPreferencesDidChangeNotification object:nil];
 }
 
 BOOL LBLockbackEnabled(void) { return lbLockbackEnabledCase; }
 BOOL LBNotificationCenterMirroringEnabled(void) { return lbNotificationCenterMirroringEnabledCase; }
 BOOL LBDisableHomeButtonUnlockEnabled(void) { return lbDisableHomeButtonUnlockEnabledCase; }
+BOOL LBMediaControlsShowsPreviousTrack(void) { return lbMediaControlsShowsPreviousTrackCase; }
 
 %ctor {
     LBReloadPreferences();
@@ -53,4 +64,5 @@ BOOL LBDisableHomeButtonUnlockEnabled(void) { return lbDisableHomeButtonUnlockEn
     LBInitializeHomeButtonBlock();   // Blocks the home button from unlocking the device (If enabled)
     LBInitializeSlideToUnlock();     // Restores iOS Slide to Unlock
     LBInitializeGrabbers();          // Restores status bar, control center and camera grabbers
+    LBInitializeMediaControls();
 }

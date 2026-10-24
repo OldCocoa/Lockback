@@ -1,6 +1,6 @@
 Package: com.patricktbp.lockback
 Name: Lockback
-Version: 1.1
+Version: 1.2
 Architecture: iphoneos-arm
 Description: Bring back the classic Slide to Unlock mechanism!
 Maintainer: patricktbp

@@ -23,7 +23,8 @@ Lockback_FILES = \
     SlideToUnlock/SlideToUnlock.x \
     Grabbers/GrabberView.x \
     Grabbers/CameraGrabber.x \
-    Grabbers.x
+    Grabbers.x \
+    MediaControls/MediaControls.x
 DEBUG.CFLAGS = -DDEBUG -O1
 Lockback_CFLAGS = -fobjc-arc
 Lockback_FRAMEWORKS = UIKit CoreGraphics QuartzCore
